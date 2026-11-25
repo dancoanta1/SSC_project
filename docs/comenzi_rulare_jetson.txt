@@ -1,0 +1,2 @@
+gcc -O2 -Wall -o server server_jetson.c
+./server
