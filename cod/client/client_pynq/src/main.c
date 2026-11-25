@@ -1,9 +1,9 @@
 /*
  * Client bare metal pe PYNQ-Z1.
  *
- *   1. porneste Ethernet-ul cu IP fix 192.168.1.10
+ *   1. porneste Ethernet-ul cu IP fix 192.168.0.10
  *   2. citeste de pe card text.txt si imagine.bmp
- *   3. le trimite la Jetson (192.168.1.20, portul 8080)
+ *   3. le trimite la Jetson (192.168.0.3, portul 8080)
  *   4. primeste fisierele noi si le scrie pe card: r_text.txt, r_orig.bmp
  *      (mai tarziu r_gray.bmp, r_gauss.bmp, r_sobel.bmp, r_binar.bmp)
  *   5. afiseaza in HTerm (115200 baud) ce s-a intamplat
@@ -14,6 +14,7 @@
 #include "xparameters.h"
 #include "netif/xadapter.h"
 #include "platform.h"
+#include "lwip/etharp.h"
 #include "platform_config.h"
 #include "xil_printf.h"
 #include "lwip/init.h"
@@ -22,7 +23,7 @@
 #include "client_pynq.h"
 
 #define JETSON_PORT  8080
-static const uint8_t JETSON_IP[4] = { 192, 168, 1, 20 };
+static const uint8_t JETSON_IP[4] = { 192, 168, 0, 3 };
 
 //variabile cerute de fisierele platform* din exemplul lwIP
 extern volatile int TcpFastTmrFlag;
@@ -36,9 +37,10 @@ void tcp_slowtmr(void);
 static uint8_t text_buf[1024 * 1024]      __attribute__((aligned(64)));
 static uint8_t image_buf[8 * 1024 * 1024] __attribute__((aligned(64)));
 
-//un pas lwIP: ceasurile TCP + pachetele venite pe Ethernet
+//un pas lwIP: ceasurile TCP si ARP + pachetele venite pe Ethernet
 static void lwip_step(void)
 {
+    static int slow_count = 0;//numar ticurile de 500 ms ca sa stiu cand a trecut o secunda
     if (TcpFastTmrFlag) {
         tcp_fasttmr();
         TcpFastTmrFlag = 0;
@@ -47,6 +49,11 @@ static void lwip_step(void)
         tcp_slowtmr();
         TcpSlowTmrFlag = 0;
         client_tick();//verific timeout-ul la fiecare 500 ms
+        slow_count++;
+        if (slow_count == 2) {
+            etharp_tmr();//o data pe secunda: repet intrebarea ARP daca Jetson nu a raspuns inca
+            slow_count = 0;
+        }
     }
     xemacif_input(echo_netif);
 }
@@ -83,9 +90,9 @@ int main(void)
     xil_printf("\r\n Proiect P7: PYNQ -> Jetson \r\n");
 
     //pornesc Ethernet-ul
-    IP4_ADDR(&ipaddr,  192, 168, 1, 10);
+    IP4_ADDR(&ipaddr,  192, 168, 0, 10);
     IP4_ADDR(&netmask, 255, 255, 255, 0);
-    IP4_ADDR(&gw,      192, 168, 1, 1);
+    IP4_ADDR(&gw,      192, 168, 0, 1);
     lwip_init();
     xemac_add(echo_netif, &ipaddr, &netmask, &gw, mac, PLATFORM_EMAC_BASEADDR);
     netif_set_default(echo_netif);
@@ -93,7 +100,7 @@ int main(void)
     platform_enable_interrupts();
 #endif
     netif_set_up(echo_netif);
-    xil_printf("[RETEA] Ethernet pornit, IP 192.168.1.10\r\n");
+    xil_printf("[RETEA] Ethernet pornit, IP 192.168.0.10\r\n");
 
     //citesc cele 2 fisiere de pe card
     if (sd_mount() != 0 || sd_read_file("0:/text.txt", text_buf, sizeof(text_buf), &text_len) != 0 || sd_read_file("0:/imagine.bmp", image_buf, sizeof(image_buf), &image_len) != 0)

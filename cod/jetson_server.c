@@ -46,7 +46,7 @@
 #define MAX_RESULTS   8
 
 //folderul in care salvez fisierele originale si rezultatele
-#define OUTPUT_DIR  "/home/utilizator/proiect_p7"//de aflat path-ul cu pwd
+#define OUTPUT_DIR  "/home/mmp/CoantaDan"//path-ul cu pwd
 
 enum { FILE_TEXT = 1, FILE_IMAGE = 2 };
 enum { TAG_ORIGINAL = 0, TAG_GRAYSCALE = 1, TAG_GAUSSIAN = 2, TAG_SOBEL = 3, TAG_BINARY = 4 };
